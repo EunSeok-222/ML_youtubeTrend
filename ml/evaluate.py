@@ -6,7 +6,8 @@ from sklearn.metrics import (accuracy_score, f1_score, classification_report,
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_curve, auc
 
-matplotlib.rcParams['font.family'] = 'AppleGothic'
+import platform
+matplotlib.rcParams['font.family'] = 'AppleGothic' if platform.system() == 'Darwin' else 'NanumGothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 

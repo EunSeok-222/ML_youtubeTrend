@@ -9,7 +9,8 @@ from ml.preprocessing import build_dataset
 from ml.train import prepare_xy, train_gradient_boosting, FEATURES
 from ml.evaluate import plot_confusion_matrix, plot_feature_importance, plot_roc_curve
 
-plt.rcParams['font.family'] = 'AppleGothic'
+import platform
+plt.rcParams['font.family'] = 'AppleGothic' if platform.system() == 'Darwin' else 'NanumGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="유튜브 조회수 구간 예측", layout="wide")
