@@ -17,8 +17,7 @@ def load_kr_data(filepath=FILEPATH):
 
 
 def convert_types(df):
-    for col in ['view_count', 'like_count', 'comment_count',
-                'daily_rank', 'daily_movement', 'weekly_movement']:
+    for col in ['view_count', 'like_count', 'comment_count', 'daily_rank']:
         df[col] = pd.to_numeric(df[col], errors='coerce')
     df['snapshot_date'] = pd.to_datetime(df['snapshot_date'])
     df['publish_date'] = pd.to_datetime(df['publish_date'], utc=True).dt.tz_localize(None)
