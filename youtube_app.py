@@ -1,26 +1,19 @@
-import csv
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
-from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import accuracy_score, f1_score, ConfusionMatrixDisplay
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, label_binarize
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import accuracy_score, f1_score
+
+from ml.preprocessing import build_dataset
+from ml.train import prepare_xy, train_gradient_boosting, FEATURES
+from ml.evaluate import plot_confusion_matrix, plot_feature_importance, plot_roc_curve
 
 plt.rcParams['font.family'] = 'AppleGothic'
 plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="유튜브 조회수 구간 예측", layout="wide")
 
-FILEPATH = 'trending_yt_videos_113_countries.csv'
-FEATURES = [
-    'title_length', 'tag_count', 'like_ratio', 'comment_ratio',
-    'days_to_trend', 'trending_days', 'publish_weekday', 'publish_hour', 'is_korean',
-    'best_rank', 'log_channel_avg',
-]
 FEATURE_LABELS = {
     'title_length':    '제목 길이',
     'tag_count':       '태그 수',
@@ -38,90 +31,16 @@ FEATURE_LABELS = {
 
 @st.cache_data(show_spinner="데이터 로딩 중... (약 1~2분 소요)")
 def load_data():
-    kr_rows = []
-    with open(FILEPATH, encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row['country'] == 'KR':
-                kr_rows.append(row)
-
-    df = pd.DataFrame(kr_rows)
-
-    for col in ['view_count', 'like_count', 'comment_count',
-                'daily_rank', 'daily_movement', 'weekly_movement']:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    df['snapshot_date'] = pd.to_datetime(df['snapshot_date'])
-    df['publish_date']  = pd.to_datetime(df['publish_date'], utc=True).dt.tz_localize(None)
-
-    agg = df.groupby('video_id').agg(
-        title         =('title', 'first'),
-        channel_name  =('channel_name', 'first'),
-        view_count    =('view_count', 'max'),
-        like_count    =('like_count', 'max'),
-        comment_count =('comment_count', 'max'),
-        best_rank     =('daily_rank', 'min'),
-        trending_days =('snapshot_date', 'nunique'),
-        first_trend   =('snapshot_date', 'min'),
-        publish_date  =('publish_date', 'first'),
-        video_tags    =('video_tags', 'first'),
-        language      =('langauge', 'first'),
-    ).reset_index()
-
-    agg['title_length']    = agg['title'].str.len()
-    agg['tag_count']       = agg['video_tags'].apply(
-        lambda x: 0 if (pd.isna(x) or str(x).strip() == '') else len(str(x).split('|'))
-    )
-    agg['like_ratio']      = agg['like_count'] / (agg['view_count'] + 1)
-    agg['comment_ratio']   = agg['comment_count'] / (agg['view_count'] + 1)
-    agg['days_to_trend']   = (agg['first_trend'] - agg['publish_date']).dt.days.clip(lower=0)
-    agg['publish_weekday'] = agg['publish_date'].dt.weekday
-    agg['publish_hour']    = agg['publish_date'].dt.hour
-    agg['is_korean']       = agg['language'].apply(lambda x: 1 if str(x).startswith('ko') else 0)
-
-    channel_avg            = agg.groupby('channel_name')['view_count'].mean()
-    agg['log_channel_avg'] = np.log1p(agg['channel_name'].map(channel_avg))
-
-    df_ml = agg.dropna(subset=['view_count', 'like_count', 'comment_count',
-                                'days_to_trend', 'publish_weekday', 'publish_hour',
-                                'best_rank']).copy()
-
-    df_ml['view_class'], bins = pd.qcut(
-        df_ml['view_count'], q=3,
-        labels=['하(저조회수)', '중(보통)', '상(고조회수)'],
-        retbins=True
-    )
-
-    return df_ml, bins
+    return build_dataset()
 
 
 @st.cache_resource(show_spinner="모델 학습 중...")
 def train_model(_df_ml):
-    le = LabelEncoder()
-    df = _df_ml.copy()
-    df['label'] = le.fit_transform(df['view_class'])
-
-    X = df[FEATURES].fillna(0)
-    y = df['label']
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-
-    model = GradientBoostingClassifier(
-        n_estimators=300,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.8,
-        min_samples_leaf=10,
-        random_state=42,
-    )
-    model.fit(X_train, y_train)
-
+    X_train, X_test, y_train, y_test, le = prepare_xy(_df_ml)
+    model = train_gradient_boosting(X_train, y_train)
     y_pred = model.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
     f1  = f1_score(y_test, y_pred, average='macro')
-
     return model, le, X_test, y_test, acc, f1
 
 
@@ -221,46 +140,20 @@ col_cm, col_fi = st.columns(2)
 
 with col_cm:
     st.write("**혼동 행렬 (Confusion Matrix)**")
-    fig, ax = plt.subplots(figsize=(4, 3))
-    ConfusionMatrixDisplay.from_estimator(
-        model, X_test, y_test,
-        display_labels=['하', '중', '상'],
-        colorbar=False, ax=ax
-    )
-    ax.set_title('혼동 행렬')
-    plt.tight_layout()
+    fig = plot_confusion_matrix(model, X_test, y_test)
     st.pyplot(fig)
     plt.close()
 
 with col_fi:
     st.write("**변수 중요도**")
-    feat_imp = pd.Series(model.feature_importances_, index=FEATURES).sort_values()
-    feat_imp.index = [FEATURE_LABELS.get(i, i) for i in feat_imp.index]
-    fig, ax = plt.subplots(figsize=(4, 3))
-    feat_imp.plot(kind='barh', color='mediumseagreen', ax=ax)
-    ax.set_title('변수 중요도', fontsize=9)
-    ax.set_xlabel('중요도', fontsize=8)
-    ax.tick_params(labelsize=7)
-    plt.tight_layout()
+    fig = plot_feature_importance(model, FEATURES, label_map=FEATURE_LABELS)
     st.pyplot(fig)
     plt.close()
 
 st.write("**ROC 곡선**")
-y_test_bin = label_binarize(y_test, classes=[0, 1, 2])
-y_score    = model.predict_proba(X_test)
-fig, ax    = plt.subplots(figsize=(5, 3.5))
-for i, (name, color) in enumerate(zip(['하(0)', '중(1)', '상(2)'],
-                                       ['#e74c3c', '#f39c12', '#2ecc71'])):
-    fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_score[:, i])
-    ax.plot(fpr, tpr, color=color, label=f'{name} (AUC={auc(fpr, tpr):.3f})')
-ax.plot([0, 1], [0, 1], 'k--')
-ax.set_xlabel('False Positive Rate')
-ax.set_ylabel('True Positive Rate')
-ax.set_title('클래스별 ROC 곡선')
-ax.legend()
-plt.tight_layout()
 roc_col, _ = st.columns(2)
 with roc_col:
+    fig = plot_roc_curve(model, X_test, y_test)
     st.pyplot(fig, use_container_width=True)
 plt.close()
 
