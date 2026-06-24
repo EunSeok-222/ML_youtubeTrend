@@ -57,7 +57,9 @@ ML_youtubeTrend/
 | 전체 규모 | 113개국, 약 50만 행 |
 | 분석 대상 | `country == 'KR'` 필터링 후 **약 19,000개** 고유 영상 |
 
-> ⚠️ CSV 파일은 용량 문제로 `.gitignore`에 포함되어 있습니다. Kaggle에서 직접 다운로드 후 루트 디렉토리에 위치시켜 주세요.
+> ⚠️ 전체 CSV 파일은 용량 문제로 `.gitignore`에 포함되어 있습니다. <br>
+현재 kr필터링된 테이터 입니다. <br>
+전체 데이터를 원하시면 Kaggle에서 직접 다운로드 후 루트 디렉토리에 위치시켜 주세요.<br>
 https://www.kaggle.com/datasets/asaniczka/trending-youtube-videos-113-countries
 ---
 
