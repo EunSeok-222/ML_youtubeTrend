@@ -58,7 +58,7 @@ ML_youtubeTrend/
 | 분석 대상 | `country == 'KR'` 필터링 후 **약 19,000개** 고유 영상 |
 
 > ⚠️ CSV 파일은 용량 문제로 `.gitignore`에 포함되어 있습니다. Kaggle에서 직접 다운로드 후 루트 디렉토리에 위치시켜 주세요.
-
+https://www.kaggle.com/datasets/asaniczka/trending-youtube-videos-113-countries
 ---
 
 ## 🔄 분석 프로세스
@@ -157,10 +157,3 @@ ngrok http 8501
 ```
 
 ---
-
-## 📌 향후 개선 사항
-
-- [ ] XGBoost / LightGBM 추가 실험
-- [ ] 피처 엔지니어링 고도화 (썸네일 이미지 분석 등)
-- [ ] 실시간 YouTube Data API 연동
-- [ ] 다국가 데이터로 범위 확장
